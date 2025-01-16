@@ -13,6 +13,7 @@ namespace Microsoft.Azure.Cosmos
     using System.Net.Http;
     using System.Net.Security;
     using System.Security.Cryptography.X509Certificates;
+    using Microsoft.Azure.Cosmos.FaultInjection;
     using Microsoft.Azure.Cosmos.Fluent;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
@@ -73,6 +74,7 @@ namespace Microsoft.Azure.Cosmos
         private IWebProxy webProxy;
         private Func<HttpClient> httpClientFactory;
         private string applicationName;
+        private IFaultInjector faultInjector;
 
         /// <summary>
         /// Creates a new CosmosClientOptions
@@ -897,6 +899,56 @@ namespace Microsoft.Azure.Cosmos
         /// Gets or sets Client Telemetry Options like feature flags and corresponding options
         /// </summary>
         public CosmosClientTelemetryOptions CosmosClientTelemetryOptions { get; set; }
+
+        /// <summary>
+        /// Create a client with Fault Injection capabilities using the Cosmos DB Fault Injection Library.
+        /// </summary>
+        /// <example>
+        /// How to create a CosmosClient with Fault Injection capabilities.
+        /// <code language="c#">
+        /// <![CDATA[
+        /// FaultInjectionRule rule = new FaultInjectionRuleBuilder(
+        ///     id: "ruleId",
+        ///     condition: new FaultInjectionConditionBuilder()
+        ///         .WithRegion("East US")
+        ///         .Build(),
+        ///     result: new FaultInjectionResultBuilder.GetResultBuilder(FaultInjectionServerErrorType.ServiceUnavailable)
+        ///         .Build())
+        ///     .Build();
+        ///     
+        /// FaultInjector faultInjector = new FaultInjector(new List<FaultInjectionRule>() { rule });
+        /// 
+        /// CosmosClientOptions clientOptions = new CosmosClientOptions()
+        /// {
+        ///     FaultInjector = faultInjector
+        /// };
+        /// 
+        /// CosmosClient client = new CosmosClient("connection string", clientOptions);
+        /// ]]>
+        /// </code>
+        /// </example> 
+        public IFaultInjector FaultInjector
+        {
+            get => this.faultInjector;
+            set
+            {
+                this.faultInjector = value;
+                if (this.faultInjector != null)
+                {
+                    this.ChaosInterceptorFactory = this.faultInjector.GetChaosInterceptorFactory();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets the throughput bucket for requests created using cosmos client.
+        /// </summary>
+        /// <remarks>
+        /// If throughput bucket is also set at request level in <see cref="RequestOptions.ThroughputBucket"/>, that throughput bucket is used.
+        /// If <see cref="AllowBulkExecution"/> is set to true in CosmosClientOptions, throughput bucket can only be set at client level.
+        /// </remarks>
+        /// <seealso href="https://aka.ms/cosmsodb-bucketing"/>
+        internal int? ThroughputBucket { get; set; }
 
         internal IChaosInterceptorFactory ChaosInterceptorFactory { get; set; }
 
